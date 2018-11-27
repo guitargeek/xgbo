@@ -11,6 +11,8 @@ def build_tree(xgtree, base_xml_element, var_indices):
         if not line: continue
         if ':leaf=' in line:
             #leaf node
+            if '-nan' in line: line = line.replace('-nan', '-999')
+            if 'nan' in line: line = line.replace('nan', '-999')
             result = re.match(r'(\t*)(\d+):leaf=({0})$'.format(regex_float_pattern), line)
             if not result:
                 print(line)
