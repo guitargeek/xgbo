@@ -7,14 +7,15 @@ regex_float_pattern = r"[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
 
 
 def build_tree(xgtree, base_xml_element, var_indices):
-    parent_element_dict = {"0": base_xml_element}
-    pos_dict = {"0": "s"}
-    for line in xgtree.split("\n"):
-        if not line:
-            continue
-        if ":leaf=" in line:
-            # leaf node
-            result = re.match(r"(\t*)(\d+):leaf=({0})$".format(regex_float_pattern), line)
+    parent_element_dict = {'0':base_xml_element}
+    pos_dict = {'0':'s'}
+    for line in xgtree.split('\n'):
+        if not line: continue
+        if ':leaf=' in line:
+            #leaf node
+            if '-nan' in line: line = line.replace('-nan', '-999')
+            if 'nan' in line: line = line.replace('nan', '-999')
+            result = re.match(r'(\t*)(\d+):leaf=({0})$'.format(regex_float_pattern), line)
             if not result:
                 print(line)
             depth = result.group(1).count("\t")
