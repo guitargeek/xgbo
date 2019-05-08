@@ -1,5 +1,5 @@
 import os
-
+import pickle
 import numpy as np
 import xgboost as xgb
 import pandas as pd
@@ -22,39 +22,35 @@ def evaleffrms(preds, dtrain, c=0.683):
 
 
 # The space of hyperparameters for the Bayesian optimization
-hyperparams_ranges = {
-    "min_child_weight": (1, 20),
-    "colsample_bytree": (0.1, 1),
-    "max_depth": (2, 15),
-    "subsample": (0.5, 1),
-    "gamma": (0, 10),
-    "reg_alpha": (0, 10),
-    "reg_lambda": (0, 10),
-}
+#hyperparams_ranges = {'min_child_weight': (1, 30),
+#                    'colsample_bytree': (0.1, 1),
+#                    'max_depth': (2, 20),
+#                    'subsample': (0.5, 1),
+#                    'gamma': (0, 20),
+#                    'reg_alpha': (0, 10),
+#                    'reg_lambda': (0, 20)}
 
 # The default xgboost parameters
-xgb_default = {
-    "min_child_weight": 1,
-    "colsample_bytree": 1,
-    "max_depth": 6,
-    "subsample": 1,
-    "gamma": 0,
-    "reg_alpha": 0,
-    "reg_lambda": 1,
-}
+#xgb_default = {'min_child_weight': 1,
+#               'colsample_bytree': 1,
+#               'max_depth': 6,
+#               'subsample': 1,
+#               'gamma': 0,
+#               'reg_alpha': 0,
+#               'reg_lambda': 1}
 
 
 def format_params(params):
     """ Casts the hyperparameters to the required type and range.
     """
     p = dict(params)
-    p["min_child_weight"] = p["min_child_weight"]
-    p["colsample_bytree"] = max(min(p["colsample_bytree"], 1), 0)
-    p["max_depth"] = int(p["max_depth"])
-    p["subsample"] = max(min(p["subsample"], 1), 0)
-    p["gamma"] = max(p["gamma"], 0)
-    p["reg_alpha"] = max(p["reg_alpha"], 0)
-    p["reg_lambda"] = max(p["reg_lambda"], 0)
+    p['min_child_weight'] = p["min_child_weight"]
+    p['colsample_bytree'] = max(min(p["colsample_bytree"], 1), 0)
+    p['max_depth']        = int(p["max_depth"])
+#    p['subsample']        = max(min(p["subsample"], 1), 0)
+    p['gamma']            = max(p["gamma"], 0)
+#    p['reg_alpha']        = max(p["reg_alpha"], 0)
+    p['reg_lambda']       = max(p["reg_lambda"], 0)
     return p
 
 
@@ -80,16 +76,16 @@ class XgboFitter(object):
         _random_state (int): seed for random number generation
     """
 
-    def __init__(
-        self,
-        out_dir,
-        random_state=2018,
-        num_rounds_max=3000,
-        num_rounds_min=0,
-        early_stop_rounds=100,
-        nthread=16,
-        regression=False,
-    ):
+
+    def __init__(self, out_dir,
+                 random_state      = 2018,
+                 num_rounds_max    = 3000,
+                 num_rounds_min    = 0,
+                 early_stop_rounds = 100,
+                 nthread           = 16,
+                 regression        = False,
+                 useEffSigma       =True
+            ):
         """The __init__ method for XgboFitter class.
 
         Args:
@@ -101,7 +97,14 @@ class XgboFitter(object):
                           ones.
         """
         self._out_dir = out_dir
-
+        pkl_file = open(out_dir+'/param_range.pkl', 'rb')
+        global hyperparams_ranges
+        hyperparams_ranges= pickle.load(pkl_file)
+        pkl_file.close()
+        pkl_file = open(out_dir+'/param_default.pkl', 'rb')
+        global xgb_default
+        xgb_default= pickle.load(pkl_file)
+        pkl_file.close()
         if not os.path.exists(os.path.join(out_dir, "cv_results")):
             os.makedirs(os.path.join(out_dir, "cv_results"))
 
@@ -111,16 +114,22 @@ class XgboFitter(object):
         self._early_stop_rounds = early_stop_rounds
 
         self.params_base = {
-            "silent": 1,
-            "verbose_eval": 0,
-            "seed": self._random_state,
-            "nthread": nthread,
-            "objective": "reg:linear",
-        }
 
+            'silent'      : 1,
+            'verbose_eval': 0,
+            'seed'        : self._random_state,
+            'nthread'     : nthread,
+            'objective'   : 'reg:linear',
+            }
+        
         if regression:
-            self._cv_cols = ["train-effrms-mean", "train-effrms-std", "test-effrms-mean", "test-effrms-std"]
-
+            xgb_default['base_score']=1#for regression the base_score should be 1, not 0.5. If enough iteration this will not matter much
+            if useEffSigma:
+                self._cv_cols =  ["train-effrms-mean", "train-effrms-std",
+                                  "test-effrms-mean", "test-effrms-std"]
+            else:
+                self._cv_cols =  ["train-rmse-mean", "train-rmse-std",
+                                  "test-rmse-mean", "test-rmse-std"]
         else:
             self._cv_cols = ["train-auc-mean", "train-auc-std", "test-auc-mean", "test-auc-std"]
 
@@ -128,6 +137,7 @@ class XgboFitter(object):
             self.params_base["eval_metric"] = "auc"
 
         self._regression = regression
+        self._useEffSigma = useEffSigma
 
         # Increment the random state by the number of previously done
         # experiments so we don't use the same numbers twice
@@ -217,10 +227,12 @@ class XgboFitter(object):
         callback_status = {"status": 0}
 
         if self._regression:
-            callbacks = [
-                early_stop(self._early_stop_rounds, start_round=self._num_rounds_min, verbose=True, eval_idx=-2)
-            ]
-            feval = evaleffrms
+            if self._useEffSigma:
+                callbacks = [early_stop(self._early_stop_rounds, start_round=self._num_rounds_min, verbose=True, eval_idx=-2)]
+                feval     = evaleffrms
+            else:
+                callbacks = [early_stop(self._early_stop_rounds, start_round=self._num_rounds_min, verbose=True),
+                             callback_overtraining(best_test_eval_metric, callback_status)]
         else:
             callbacks = [
                 early_stop(self._early_stop_rounds, start_round=self._num_rounds_min, verbose=True),
