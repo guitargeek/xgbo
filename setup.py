@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='xgbo',
-    version='0.1',
+    version='0.2',
     description='Xgboost with Bayesian optimization',
     long_description='Train xgboost calssifiers and regressors with Bayesian optimized hyperparameters.',
     url='http://github.com/guitargeek/xgbo',
@@ -12,12 +12,5 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
-    install_requires=[
-   'numpy',
-   'pandas',
-   'tables',
-   'xgboost',
-   'sklearn',
-   'matplotlib',
-    ]
+    install_requires=["bayesian-optimization", "numpy", "pandas", "tables", "xgboost", "sklearn", "matplotlib"],
 )
