@@ -6,8 +6,11 @@ Classification and regression with xgboost plus Bayesian optimization for hyperp
 
 This package can be installed with pip. Clone and install it as follows:
 ```
-#git clone git@github.com:guitargeek/xgbo.git #this is the original branch from jrembser
-git clone -b michelif_testBO_20190123 git@github.com:michelif/xgbo.git
+git clone git@github.com:guitargeek/xgbo.git
 cd xgbo
 pip install --user .
 ```
+
+## Development notes
+
+Plese format the edited python sources with [black](https://github.com/ambv/black) before making any pull request, setting the `--line-length 120` argument.
