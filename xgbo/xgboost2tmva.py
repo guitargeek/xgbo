@@ -6,7 +6,7 @@ import xml.etree.cElementTree as ET
 regex_float_pattern = r"[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
 
 
-def build_tree(xgtree, base_xml_element, var_indices):
+def build_tree(xgtree, base_xml_element, var_indices, fillna=None):
     parent_element_dict = {"0": base_xml_element}
     pos_dict = {"0": "s"}
     for line in xgtree.split("\n"):
@@ -14,10 +14,11 @@ def build_tree(xgtree, base_xml_element, var_indices):
             continue
         if ":leaf=" in line:
             # leaf node
-            if "-nan" in line:
-                line = line.replace("-nan", "-999")
-            if "nan" in line:
-                line = line.replace("nan", "-999")
+            if not fillna is None:
+                if "-nan" in line:
+                    line = line.replace("-nan", "-999")
+                if "nan" in line:
+                    line = line.replace("nan", "-999")
             result = re.match(r"(\t*)(\d+):leaf=({0})$".format(regex_float_pattern), line)
             if not result:
                 print(line)
@@ -74,7 +75,7 @@ def build_tree(xgtree, base_xml_element, var_indices):
             parent_element_dict[rnode] = node_elementTree
 
 
-def convert_model(model, input_variables, output_xml):
+def convert_model(model, input_variables, output_xml, fillna=None):
     NTrees = len(model)
     var_list = input_variables
     var_indices = {}
@@ -117,7 +118,7 @@ def convert_model(model, input_variables, output_xml):
 
     for itree in range(NTrees):
         BinaryTree = ET.SubElement(Weights, "BinaryTree", type="DecisionTree", boostWeight="1.0e+00", itree=str(itree))
-        build_tree(model[itree], BinaryTree, var_indices)
+        build_tree(model[itree], BinaryTree, var_indices, fillna=fillna)
 
     tree = ET.ElementTree(MethodSetup)
     tree.write(output_xml)
